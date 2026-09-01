@@ -1,0 +1,20 @@
+{
+  "name": "Quiq Offline Quiz Scanner",
+  "short_name": "Quiq Scanner",
+  "description": "Scan, store, analyze, and export offline classroom quiz results.",
+  "start_url": "/scanner",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0d1420",
+  "theme_color": "#111a27",
+  "orientation": "any",
+  "categories": ["education", "productivity"],
+  "icons": [
+    {
+      "src": "/quiq-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

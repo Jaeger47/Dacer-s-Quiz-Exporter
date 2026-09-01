@@ -1,0 +1,29 @@
+{
+  "format": "QUIQ_RESULT",
+  "version": "1.0",
+  "resultId": "IT123-Q1-2026-20260001-A1-8F4K2M",
+  "quizId": "IT123-Q1-2026",
+  "quizTitle": "Object-Oriented Programming Quiz",
+  "subject": "IT 123",
+  "section": "BSIT 2A",
+  "teacher": "Mark Daniel G. Dacer",
+  "studentName": "Juan Dela Cruz",
+  "studentId": "20260001",
+  "studentSection": "BSIT 2A",
+  "attempt": 1,
+  "score": 1,
+  "totalScore": 2,
+  "percentage": 50,
+  "passed": false,
+  "passingPercentage": 75,
+  "startedAt": "2026-09-01T05:00:00.000Z",
+  "submittedAt": "2026-09-01T05:12:00.000Z",
+  "durationSeconds": 720,
+  "submissionReason": "manual",
+  "autoSubmitted": false,
+  "violations": [{ "type": "tab-switch", "timestamp": "2026-09-01T05:06:00.000Z" }],
+  "responses": [
+    { "questionId": "Q001", "selectedAnswer": 0, "correctAnswer": 0, "correct": true, "pointsAwarded": 1 },
+    { "questionId": "Q002", "selectedAnswer": 1, "correctAnswer": 0, "correct": false, "pointsAwarded": 0 }
+  ]
+}
