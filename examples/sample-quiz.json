@@ -9,6 +9,7 @@
   "settings": {
     "durationMinutes": 30,
     "allowedAttempts": 1,
+    "resetPassword": "QUIQ-RESET-2026",
     "passingPercentage": 75,
     "randomizeQuestions": true,
     "randomizeChoices": true,

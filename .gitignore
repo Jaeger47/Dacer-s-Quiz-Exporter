@@ -33,7 +33,14 @@ yarn-error.log*
 .vercel
 next-env.d.ts
 /dist/
+/.netlify/
+/.output/
 /.wrangler/
 /outputs/
 /work/
 *.tsbuildinfo
+
+# local server launcher state
+.quiq-server.pid
+.quiq-server.log
+.quiq-server-error.log

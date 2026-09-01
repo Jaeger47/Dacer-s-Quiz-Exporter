@@ -49,6 +49,24 @@ For a production check:
 npm run build
 ```
 
+For a Netlify production check:
+
+```bash
+npm run build:netlify
+```
+
+## Deploy with GitHub and Netlify
+
+The repository includes `netlify.toml` and a dedicated Nitro build for Netlify. The existing local and Cloudflare build remains available through `npm run build`.
+
+1. Push this project to a private GitHub repository.
+2. In Netlify, choose **Add new project** and **Import an existing project**.
+3. Select GitHub and choose the repository.
+4. Netlify will read the committed build command and publish directory; select **Deploy**.
+5. After the first deployment, open `/scanner` on the HTTPS Netlify URL and allow camera permission.
+
+Every push to the connected GitHub branch creates a new Netlify deployment. Quiz drafts, attempts, and scanned results remain browser-local; deploying the app does not upload that data to a database.
+
 Normal student use does **not** require Node.js. Students receive the exported `.html` file and double-click it.
 
 ## Create a quiz
@@ -88,7 +106,9 @@ Validation errors identify the affected question whenever possible.
 
 ## Standalone student quiz
 
-The exported file is named from Quiz ID, for example `IT123-Q1-2026.html`. It embeds quiz data, styling, timer, attempt controls, security monitoring, scoring, result integrity checking, compression, multi-part QR support, and the QR generator library.
+The exported file is named from Quiz ID, for example `IT123-Q1-2026.html`. It embeds quiz data, styling, timer, attempt controls, security monitoring, scoring, result integrity checking, compression, multi-part QR support, and the QR generator library. The embedded JavaScript and quiz payload are obfuscated during export with mangled identifiers, encoded strings, transformed control flow, and injected dead code to discourage casual source inspection.
+
+Obfuscation is tamper deterrence, not perfect secrecy. A standalone offline browser file must eventually execute its answer-checking logic, so a technically knowledgeable person with enough time can still analyze or modify it.
 
 Students can copy the file to a computer and double-click it. No web server or internet connection is required.
 
@@ -104,13 +124,17 @@ At zero, the quiz submits with `submissionReason: "timeout"`. Reaching the confi
 
 ### Attempts
 
-Attempts are keyed by Quiz ID and Student ID in local browser storage. A submitted result can be reopened with **View last submitted result** without consuming another attempt. The controlled **Reset local quiz data** action clears attempts, saved progress, and the last result after confirmation.
+Attempts are keyed by Quiz ID and Student ID in local browser storage. When the configured limit is reached (one attempt by default), reopening the quiz goes directly to the locked submitted-result screen. The student can display the saved QR again but cannot edit answers or submit again. The result screen shows **Attempts used** as a count such as `1 / 1`.
+
+The teacher configures a reset password in **Quiz settings** before exporting. **Teacher reset** requires that password before clearing attempts, saved progress, and the submitted result. The reset password is an offline classroom control, not strong cryptographic security: a technically knowledgeable user can inspect a standalone HTML file or clear browser storage.
 
 Browser-side attempt controls are a practical deterrent, not an unbreakable control. Clearing browser storage or editing client code can bypass them.
 
 ### Security monitoring
 
-Optional checks include fullscreen, tab switching, focus loss, fullscreen exit, copy, paste, right click, text selection, and page exit. Related browser events are debounced so one tab-switch incident is not counted repeatedly as both a visibility change and focus loss.
+Optional checks include fullscreen, tab switching, focus loss, fullscreen exit, copy, paste, right click, text selection, and page exit. Related browser events are debounced so one tab-switch incident is not counted repeatedly as both a visibility change and focus loss. When required fullscreen is exited, the questions are covered by a security prompt while the timer continues. The student must choose **Return to fullscreen** or **Submit quiz now**; browsers require this user action before fullscreen can be restored.
+
+The maximum-violation limit is absolute. Reaching it immediately ends and submits the quiz, locks all answers, calculates the result, and records `submissionReason: "security-limit"`. Older imported quizzes configured as “warning only” are automatically upgraded to this behavior.
 
 Security events are stored with timestamps and included in the result. These controls provide monitoring and tamper deterrence. A standalone HTML file cannot guarantee cryptographically secure exam authenticity because a knowledgeable student can inspect its code and data.
 
