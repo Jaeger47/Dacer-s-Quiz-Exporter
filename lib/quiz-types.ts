@@ -12,10 +12,8 @@ export interface QuizQuestion {
 export interface QuizSettings {
   durationMinutes: number;
   allowedAttempts: number;
-<<<<<<< HEAD
   resetPassword?: string;
-=======
->>>>>>> b494772 (Build Quiq offline quiz and QR scanner)
+  resultDataMode?: 'simple' | 'complete';
   passingPercentage: number;
   randomizeQuestions: boolean;
   randomizeChoices: boolean;
@@ -122,10 +120,8 @@ export const sampleQuiz: Quiz = {
   settings: {
     durationMinutes: 30,
     allowedAttempts: 1,
-<<<<<<< HEAD
     resetPassword: 'QUIQ-RESET-2026',
-=======
->>>>>>> b494772 (Build Quiq offline quiz and QR scanner)
+    resultDataMode: 'simple',
     passingPercentage: 75,
     randomizeQuestions: true,
     randomizeChoices: true,
@@ -218,12 +214,10 @@ export function validateQuiz(value: unknown): { valid: boolean; errors: string[]
     if (!Number.isFinite(Number(question?.points)) || Number(question.points) <= 0) errors.push(`${label} must have a positive point value.`);
   });
   if (!quiz.settings || !quiz.security) errors.push('Quiz settings or security configuration is missing.');
-<<<<<<< HEAD
-  if (quiz.settings && String(quiz.settings.resetPassword || '').trim().length < 4) {
-    errors.push('Set a teacher reset password with at least 4 characters in Quiz settings.');
+  if (quiz.settings) {
+    if (String(quiz.settings.resetPassword || '').trim().length < 4) errors.push('Set a teacher reset password with at least 4 characters in Quiz settings.');
+    if (!['simple', 'complete'].includes(String(quiz.settings.resultDataMode || 'simple'))) quiz.settings.resultDataMode = 'simple';
   }
   if (quiz.security) quiz.security.action = 'auto-submit';
-=======
->>>>>>> b494772 (Build Quiq offline quiz and QR scanner)
   return errors.length ? { valid: false, errors } : { valid: true, errors, quiz: quiz as Quiz };
 }

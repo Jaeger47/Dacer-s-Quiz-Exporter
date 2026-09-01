@@ -13,7 +13,6 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-<<<<<<< HEAD
   metadataBase: new URL('https://quiq-offline-classroom.markdacer22.chatgpt.site'),
   title: 'Quiq Offline — Classroom Exam System',
   description:
@@ -40,11 +39,6 @@ export const metadata: Metadata = {
     description: 'Create exams. Scan results. Stay offline.',
     images: ['https://quiq-offline-classroom.markdacer22.chatgpt.site/og.png'],
   },
-=======
-  title: 'Quiq Offline — Classroom Exam System',
-  description:
-    'Create offline quizzes, transfer results by QR, and analyze classroom performance privately on your device.',
->>>>>>> b494772 (Build Quiq offline quiz and QR scanner)
 };
 
 export default function RootLayout({

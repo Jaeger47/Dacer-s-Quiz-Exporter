@@ -33,6 +33,7 @@ import type { QrEnvelope, QuizResult } from '@/lib/quiz-types';
 
 type ScannerTab = 'scan' | 'results' | 'analysis' | 'more';
 type PartialScan = { totalParts: number; encoding: QrEnvelope['encoding']; checksum: string; chunks: Record<number, string> };
+const DEFAULT_CAMERA_KEY = 'quiq-scanner-default-camera';
 
 function download(content: BlobPart, filename: string, type: string) {
   const url = URL.createObjectURL(new Blob([content], { type }));
@@ -66,6 +67,8 @@ export function ScannerApp() {
   const [page, setPage] = useState(1);
   const [manual, setManual] = useState('');
   const [cameraIndex, setCameraIndex] = useState(0);
+  const [cameras, setCameras] = useState<MediaDeviceInfo[]>([]);
+  const [defaultCameraId, setDefaultCameraId] = useState('');
   const [torch, setTorch] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const controlsRef = useRef<IScannerControls | undefined>(undefined);
@@ -84,6 +87,8 @@ export function ScannerApp() {
 
   useEffect(() => {
     refresh();
+    setDefaultCameraId(localStorage.getItem(DEFAULT_CAMERA_KEY) || '');
+    void loadCameras();
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('/service-worker.js').catch(() => setMessage('Offline cache will be available after the next visit.'));
     return () => controlsRef.current?.stop();
   }, []);
@@ -106,6 +111,24 @@ export function ScannerApp() {
   const pageResults = filtered.slice((page - 1) * 20, page * 20);
   const pageCount = Math.max(1, Math.ceil(filtered.length / 20));
 
+  async function loadCameras() {
+    try {
+      const devices = await BrowserQRCodeReader.listVideoInputDevices();
+      setCameras(devices);
+      return devices;
+    } catch {
+      return [];
+    }
+  }
+
+  function chooseDefaultCamera(cameraId: string) {
+    setDefaultCameraId(cameraId);
+    if (cameraId) localStorage.setItem(DEFAULT_CAMERA_KEY, cameraId);
+    else localStorage.removeItem(DEFAULT_CAMERA_KEY);
+    const index = cameras.findIndex((camera) => camera.deviceId === cameraId);
+    if (index >= 0) setCameraIndex(index);
+  }
+
   async function startScanner(cameraOverride?: number) {
     setError('');
     setPreview(undefined);
@@ -115,14 +138,16 @@ export function ScannerApp() {
       return;
     }
     try {
-      const devices = await BrowserQRCodeReader.listVideoInputDevices();
+      const devices = await loadCameras();
       const activeCameraIndex = cameraOverride ?? cameraIndex;
-      const selected = devices[activeCameraIndex % Math.max(1, devices.length)];
+      const selected = devices.find((camera) => camera.deviceId === defaultCameraId) || devices[activeCameraIndex % Math.max(1, devices.length)];
       const reader = new BrowserQRCodeReader(undefined, { delayBetweenScanAttempts: 180 });
       setScanning(true);
-      setMessage(devices.length ? `Camera ${activeCameraIndex % devices.length + 1} of ${devices.length}` : 'Rear camera requested');
+      setMessage(defaultCameraId && selected ? `Using saved camera: ${selected.label || 'Camera'}` : 'Rear camera requested');
       controlsRef.current = await reader.decodeFromConstraints(
-        selected ? { video: { deviceId: { exact: selected.deviceId } }, audio: false } : { video: { facingMode: { ideal: 'environment' } }, audio: false },
+        defaultCameraId && selected
+          ? { video: { deviceId: { exact: selected.deviceId }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false }
+          : { video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false },
         videoRef.current!,
         (scanResult, scanError) => {
           if (scanResult) {
@@ -136,6 +161,7 @@ export function ScannerApp() {
           if (scanError && scanError.name !== 'NotFoundException') setMessage('Keep the QR code inside the frame.');
         },
       );
+      void loadCameras();
     } catch (cameraError) {
       setScanning(false);
       setError(cameraError instanceof DOMException && cameraError.name === 'NotAllowedError' ? 'Camera permission denied. Allow camera access in browser settings, then try again.' : 'Unable to start a camera. Check camera access or use manual input.');
@@ -199,6 +225,16 @@ export function ScannerApp() {
     return result;
   }
 
+  function simpleResult(value: unknown): QuizResult {
+    const result = value as Record<string, unknown>;
+    if (result?.format !== 'QUIQ_SIMPLE_RESULT' || result.version !== '1.0' || !String(result.resultId || '').trim() || !String(result.studentName || '').trim() || !Number.isFinite(Number(result.score)) || !Number.isFinite(Number(result.totalScore))) throw new Error('The QR data is not a supported simple Quiq result.');
+    const submittedAt = typeof result.submittedAt === 'string' && !Number.isNaN(Date.parse(result.submittedAt)) ? result.submittedAt : new Date().toISOString();
+    const totalScore = Number(result.totalScore);
+    const score = Number(result.score);
+    const percentage = Number.isFinite(Number(result.percentage)) ? Number(result.percentage) : totalScore ? Math.round((score / totalScore) * 10000) / 100 : 0;
+    return { format: 'QUIQ_RESULT', version: '1.0', resultId: String(result.resultId), quizId: 'SIMPLE', quizTitle: 'Simple QR result', subject: '', section: '', teacher: '', studentName: String(result.studentName), studentId: '', studentSection: '', attempt: Number(result.attempt) || 1, score, totalScore, percentage, passed: false, passingPercentage: 0, startedAt: submittedAt, submittedAt, durationSeconds: 0, submissionReason: 'manual', autoSubmitted: false, violations: [], responses: [] };
+  }
+
   async function showPreview(result: QuizResult) {
     const existing = await findSecondaryDuplicate(result);
     setDuplicate(existing);
@@ -212,6 +248,10 @@ export function ScannerApp() {
     try {
       setError('');
       const parsed = JSON.parse(value);
+      if (parsed?.format === 'QUIQ_SIMPLE_RESULT') {
+        await showPreview(simpleResult(parsed));
+        return;
+      }
       if (parsed?.format === 'QUIQ_RESULT') {
         await showPreview(validateResult(parsed));
         return;
@@ -257,8 +297,11 @@ export function ScannerApp() {
       setMessage('Result saved on this device');
       setPreview(undefined);
       setDuplicate(undefined);
+      setParts({});
+      partsRef.current = {};
       await refresh();
-      setTab('results');
+      setTab('scan');
+      window.setTimeout(() => void startScanner(), 120);
     } catch (storageError) {
       setError((storageError as Error).message);
     }
@@ -318,7 +361,7 @@ export function ScannerApp() {
 
         <section className="min-w-0 p-4 sm:p-6 lg:p-9">
           {error && <div className="mb-5 flex items-start justify-between gap-4 border-l-2 border-destructive bg-destructive/10 p-4 text-sm text-destructive" role="alert"><span>{error}</span><button aria-label="Dismiss error" onClick={() => setError('')}><X className="size-4" /></button></div>}
-          {tab === 'scan' && <ScanView scanning={scanning} videoRef={videoRef} message={message} parts={parts} preview={preview} duplicate={duplicate} manual={manual} setManual={setManual} processScannedValue={processScannedValue} startScanner={startScanner} stopScanner={stopScanner} switchCamera={switchCamera} toggleTorch={toggleTorch} torch={torch} storePreview={storePreview} setPreview={setPreview} setDetail={setDetail} setTab={setTab} />}
+          {tab === 'scan' && <><ScanView scanning={scanning} videoRef={videoRef} message={message} parts={parts} preview={preview} duplicate={duplicate} manual={manual} setManual={setManual} processScannedValue={processScannedValue} startScanner={startScanner} stopScanner={stopScanner} switchCamera={switchCamera} toggleTorch={toggleTorch} torch={torch} storePreview={storePreview} setPreview={setPreview} setDetail={setDetail} setTab={setTab} />{cameras.length > 0 && <label className="mx-auto mt-4 flex max-w-4xl items-center justify-between gap-4 border border-border bg-card p-4 text-sm"><span><strong className="block">Default camera</strong><span className="mt-1 block text-xs text-muted-foreground">Used automatically for the next scan on this device.</span></span><select value={defaultCameraId} onChange={(event) => chooseDefaultCamera(event.target.value)} className="native-control max-w-64"><option value="">Rear camera (automatic)</option>{cameras.map((camera, index) => <option key={camera.deviceId} value={camera.deviceId}>{camera.label || `Camera ${index + 1}`}</option>)}</select></label>}</>}
           {tab === 'results' && <ResultsView results={pageResults} total={filtered.length} summary={summary} search={search} setSearch={setSearch} statusFilter={statusFilter} setStatusFilter={setStatusFilter} page={page} pageCount={pageCount} setPage={setPage} detail={detail} setDetail={setDetail} removeResult={removeResult} editStudent={editStudent} refresh={refresh} />}
           {tab === 'analysis' && <AnalysisView analysis={analysis} results={results} />}
           {tab === 'more' && <MoreView results={results} importRef={importRef} importBackup={importBackup} setMessage={setMessage} refresh={refresh} setError={setError} />}

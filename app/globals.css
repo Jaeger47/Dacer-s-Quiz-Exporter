@@ -1,12 +1,6 @@
-<<<<<<< HEAD
 @import '../node_modules/tailwindcss/index.css';
 @import '../node_modules/tw-animate-css/dist/tw-animate.css';
 @import '../node_modules/shadcn/dist/tailwind.css';
-=======
-@import 'tailwindcss';
-@import 'tw-animate-css';
-@import 'shadcn/tailwind.css';
->>>>>>> b494772 (Build Quiq offline quiz and QR scanner)
 
 @custom-variant dark (&:is(.dark *));
 

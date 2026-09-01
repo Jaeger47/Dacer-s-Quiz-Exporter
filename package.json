@@ -8,10 +8,7 @@
   "scripts": {
     "dev": "vinext dev",
     "build": "vinext build",
-<<<<<<< HEAD
     "build:netlify": "vite build --mode netlify",
-=======
->>>>>>> b494772 (Build Quiq offline quiz and QR scanner)
     "start": "wrangler dev --config dist/server/wrangler.json",
     "lint": "oxlint",
     "format": "oxfmt"
@@ -26,13 +23,9 @@
     "date-fns": "4.1.0",
     "embla-carousel-react": "8.5.2",
     "input-otp": "1.4.2",
-<<<<<<< HEAD
     "javascript-obfuscator": "5.6.0",
     "lucide-react": "1.31.0",
     "nitro": "3.0.260610-beta",
-=======
-    "lucide-react": "1.31.0",
->>>>>>> b494772 (Build Quiq offline quiz and QR scanner)
     "qrcode-generator": "^2.0.4",
     "react": "19.2.6",
     "react-day-picker": "9.8.1",
