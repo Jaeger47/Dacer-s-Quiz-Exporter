@@ -1,0 +1,58 @@
+{
+  "version": "1.0",
+  "quizId": "IT123-Q1-2026",
+  "quizTitle": "Object-Oriented Programming Quiz",
+  "subject": "IT 123",
+  "section": "BSIT 2A",
+  "teacher": "Mark Daniel G. Dacer",
+  "instructions": "Read every question carefully and select the best answer.",
+  "settings": {
+    "durationMinutes": 30,
+    "allowedAttempts": 1,
+    "resetPassword": "QUIQ-RESET-2026",
+    "passingPercentage": 75,
+    "randomizeQuestions": true,
+    "randomizeChoices": true,
+    "requireName": true,
+    "requireStudentId": true,
+    "requireSection": true,
+    "showScore": true,
+    "showPercentage": true,
+    "showCorrectAnswers": false,
+    "showReview": false,
+    "autoSubmitOnTimeout": true,
+    "resumeAfterRefresh": true
+  },
+  "security": {
+    "enabled": true,
+    "requireFullscreen": true,
+    "detectTabSwitch": true,
+    "detectFocusLoss": true,
+    "detectFullscreenExit": true,
+    "detectCopy": true,
+    "detectPaste": true,
+    "disableRightClick": true,
+    "disableTextSelection": false,
+    "detectPageExit": true,
+    "maximumViolations": 3,
+    "action": "auto-submit"
+  },
+  "questions": [
+    {
+      "id": "Q001",
+      "type": "multiple-choice",
+      "question": "What does CPU stand for?",
+      "choices": ["Central Processing Unit", "Computer Processing Utility", "Central Program Unit", "Computer Program Utility"],
+      "answer": 0,
+      "points": 1
+    },
+    {
+      "id": "Q002",
+      "type": "true-false",
+      "question": "Java supports object-oriented programming.",
+      "choices": ["True", "False"],
+      "answer": 0,
+      "points": 1
+    }
+  ]
+}
