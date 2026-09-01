@@ -71,6 +71,7 @@ export function ScannerApp() {
   const controlsRef = useRef<IScannerControls | undefined>(undefined);
   const lastScan = useRef({ value: '', time: 0 });
   const importRef = useRef<HTMLInputElement>(null);
+  const qrImageRef = useRef<HTMLInputElement>(null);
   const partsRef = useRef<Record<string, PartialScan>>({});
 
   const refresh = async () => {
@@ -120,9 +121,13 @@ export function ScannerApp() {
       const selected = devices[activeCameraIndex % Math.max(1, devices.length)];
       const reader = new BrowserQRCodeReader(undefined, { delayBetweenScanAttempts: 180 });
       setScanning(true);
-      setMessage(devices.length ? `Camera ${activeCameraIndex % devices.length + 1} of ${devices.length}` : 'Rear camera requested');
+      setMessage(cameraOverride === undefined ? 'Using the rear-camera preference. Keep the QR fully inside the frame.' : `Camera ${activeCameraIndex % devices.length + 1} of ${devices.length}`);
       controlsRef.current = await reader.decodeFromConstraints(
-        selected ? { video: { deviceId: { exact: selected.deviceId } }, audio: false } : { video: { facingMode: { ideal: 'environment' } }, audio: false },
+        cameraOverride === undefined
+          ? { video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false }
+          : selected
+            ? { video: { deviceId: { exact: selected.deviceId }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false }
+            : { video: { facingMode: { ideal: 'environment' } }, audio: false },
         videoRef.current!,
         (scanResult, scanError) => {
           if (scanResult) {
@@ -243,6 +248,21 @@ export function ScannerApp() {
     }
   }
 
+  async function scanQrImage(file?: File) {
+    if (!file) return;
+    setError('');
+    const url = URL.createObjectURL(file);
+    try {
+      const reader = new BrowserQRCodeReader();
+      const result = await reader.decodeFromImageUrl(url);
+      await processScannedValue(result.getText());
+    } catch {
+      setError('Could not read a Quiq QR code from that image. Use a sharp, uncropped screenshot or try the camera again.');
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  }
+
   async function storePreview() {
     if (!preview) return;
     if (duplicate?.resultId === preview.resultId) {
@@ -318,13 +338,14 @@ export function ScannerApp() {
 
         <section className="min-w-0 p-4 sm:p-6 lg:p-9">
           {error && <div className="mb-5 flex items-start justify-between gap-4 border-l-2 border-destructive bg-destructive/10 p-4 text-sm text-destructive" role="alert"><span>{error}</span><button aria-label="Dismiss error" onClick={() => setError('')}><X className="size-4" /></button></div>}
-          {tab === 'scan' && <ScanView scanning={scanning} videoRef={videoRef} message={message} parts={parts} preview={preview} duplicate={duplicate} manual={manual} setManual={setManual} processScannedValue={processScannedValue} startScanner={startScanner} stopScanner={stopScanner} switchCamera={switchCamera} toggleTorch={toggleTorch} torch={torch} storePreview={storePreview} setPreview={setPreview} setDetail={setDetail} setTab={setTab} />}
+          {tab === 'scan' && <><ScanView scanning={scanning} videoRef={videoRef} message={message} parts={parts} preview={preview} duplicate={duplicate} manual={manual} setManual={setManual} processScannedValue={processScannedValue} startScanner={startScanner} stopScanner={stopScanner} switchCamera={switchCamera} toggleTorch={toggleTorch} torch={torch} storePreview={storePreview} setPreview={setPreview} setDetail={setDetail} setTab={setTab} /><div className="mx-auto mt-4 max-w-4xl"><Button variant="outline" onClick={() => qrImageRef.current?.click()}><Upload /> Scan a saved QR image</Button></div></>}
           {tab === 'results' && <ResultsView results={pageResults} total={filtered.length} summary={summary} search={search} setSearch={setSearch} statusFilter={statusFilter} setStatusFilter={setStatusFilter} page={page} pageCount={pageCount} setPage={setPage} detail={detail} setDetail={setDetail} removeResult={removeResult} editStudent={editStudent} refresh={refresh} />}
           {tab === 'analysis' && <AnalysisView analysis={analysis} results={results} />}
           {tab === 'more' && <MoreView results={results} importRef={importRef} importBackup={importBackup} setMessage={setMessage} refresh={refresh} setError={setError} />}
         </section>
       </div>
       <input ref={importRef} type="file" accept="application/json,.json" hidden onChange={(event) => importBackup(event.target.files?.[0])} />
+      <input ref={qrImageRef} type="file" accept="image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp" hidden onChange={(event) => { void scanQrImage(event.target.files?.[0]); event.currentTarget.value = ''; }} />
     </main>
   );
 }

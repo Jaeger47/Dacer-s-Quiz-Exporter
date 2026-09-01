@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import Link from 'next/link';
 import {
   ArrowDown,
   ArrowUp,
@@ -213,7 +212,7 @@ export function AdminApp() {
           </button>
           <div className="flex items-center gap-2">
             <Badge variant="outline" className="hidden h-7 gap-1.5 rounded-sm border-emerald-800/60 bg-emerald-950/50 px-2.5 text-emerald-300 sm:flex"><span className="size-1.5 rounded-full bg-emerald-400" /> Offline ready</Badge>
-            <Link href="/scanner" className={buttonVariants({ variant: 'outline', className: 'h-10 px-3 text-muted-foreground' })}><QrCode /> Scanner</Link>
+            <a href="/scanner" className={buttonVariants({ variant: 'outline', className: 'h-10 px-3 text-muted-foreground' })}><QrCode /> Scanner</a>
           </div>
         </div>
       </header>
