@@ -9,7 +9,10 @@
   "settings": {
     "durationMinutes": 30,
     "allowedAttempts": 1,
+<<<<<<< HEAD
     "resetPassword": "QUIQ-RESET-2026",
+=======
+>>>>>>> b494772 (Build Quiq offline quiz and QR scanner)
     "passingPercentage": 75,
     "randomizeQuestions": true,
     "randomizeChoices": true,

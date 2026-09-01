@@ -33,14 +33,20 @@ yarn-error.log*
 .vercel
 next-env.d.ts
 /dist/
+<<<<<<< HEAD
 /.netlify/
 /.output/
+=======
+>>>>>>> b494772 (Build Quiq offline quiz and QR scanner)
 /.wrangler/
 /outputs/
 /work/
 *.tsbuildinfo
+<<<<<<< HEAD
 
 # local server launcher state
 .quiq-server.pid
 .quiq-server.log
 .quiq-server-error.log
+=======
+>>>>>>> b494772 (Build Quiq offline quiz and QR scanner)
