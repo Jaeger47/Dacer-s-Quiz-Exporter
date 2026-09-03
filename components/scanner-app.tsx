@@ -33,7 +33,9 @@ import type { QrEnvelope, QuizResult } from '@/lib/quiz-types';
 
 type ScannerTab = 'scan' | 'results' | 'analysis' | 'more';
 type PartialScan = { totalParts: number; encoding: QrEnvelope['encoding']; checksum: string; chunks: Record<number, string> };
+type ScanMode = 'simple' | 'complete';
 const DEFAULT_CAMERA_KEY = 'quiq-scanner-default-camera';
+const SCAN_MODE_KEY = 'quiq-scanner-result-mode';
 
 function download(content: BlobPart, filename: string, type: string) {
   const url = URL.createObjectURL(new Blob([content], { type }));
@@ -69,6 +71,7 @@ export function ScannerApp() {
   const [cameraIndex, setCameraIndex] = useState(0);
   const [cameras, setCameras] = useState<MediaDeviceInfo[]>([]);
   const [defaultCameraId, setDefaultCameraId] = useState('');
+  const [scanMode, setScanMode] = useState<ScanMode>('simple');
   const [torch, setTorch] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const controlsRef = useRef<IScannerControls | undefined>(undefined);
@@ -88,6 +91,7 @@ export function ScannerApp() {
   useEffect(() => {
     refresh();
     setDefaultCameraId(localStorage.getItem(DEFAULT_CAMERA_KEY) || '');
+    setScanMode(localStorage.getItem(SCAN_MODE_KEY) === 'complete' ? 'complete' : 'simple');
     void loadCameras();
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('/service-worker.js').catch(() => setMessage('Offline cache will be available after the next visit.'));
     return () => controlsRef.current?.stop();
@@ -127,6 +131,18 @@ export function ScannerApp() {
     else localStorage.removeItem(DEFAULT_CAMERA_KEY);
     const index = cameras.findIndex((camera) => camera.deviceId === cameraId);
     if (index >= 0) setCameraIndex(index);
+  }
+
+  function chooseScanMode(mode: ScanMode) {
+    setScanMode(mode);
+    localStorage.setItem(SCAN_MODE_KEY, mode);
+    setError('');
+    setMessage(`${mode === 'simple' ? 'Simple' : 'Full'} QR result mode selected`);
+  }
+
+  function ensureAcceptedMode(format: string | undefined) {
+    const resultMode: ScanMode | undefined = format === 'QUIQ_SIMPLE_RESULT' ? 'simple' : format === 'QUIQ_RESULT' ? 'complete' : undefined;
+    if (resultMode && resultMode !== scanMode) throw new Error(`This is a ${resultMode === 'simple' ? 'Simple' : 'Full'} QR result. Switch the scanner to ${resultMode === 'simple' ? 'Simple' : 'Full'} mode and scan again.`);
   }
 
   async function startScanner(cameraOverride?: number) {
@@ -249,10 +265,12 @@ export function ScannerApp() {
       setError('');
       const parsed = JSON.parse(value);
       if (parsed?.format === 'QUIQ_SIMPLE_RESULT') {
+        ensureAcceptedMode(parsed.format);
         await showPreview(simpleResult(parsed));
         return;
       }
       if (parsed?.format === 'QUIQ_RESULT') {
+        ensureAcceptedMode(parsed.format);
         await showPreview(validateResult(parsed));
         return;
       }
@@ -272,6 +290,7 @@ export function ScannerApp() {
         const payload = Array.from({ length: partial.totalParts }, (_, index) => partial.chunks[index + 1]).join('');
         if (await sha256(payload) !== partial.checksum) throw new Error('Invalid result data. The scanned QR payload appears damaged or incomplete.');
         const decoded = await decodePayload(payload, partial.encoding);
+        ensureAcceptedMode((decoded as { format?: string })?.format);
         const result = (decoded as { format?: string })?.format === 'QUIQ_SIMPLE_RESULT' ? simpleResult(decoded) : validateResult(decoded);
         if (result.resultId !== envelope.resultId) throw new Error('Result identity does not match the QR envelope.');
         delete next[envelope.resultId];
@@ -362,7 +381,7 @@ export function ScannerApp() {
 
         <section className="min-w-0 p-4 sm:p-6 lg:p-9">
           {error && <div className="mb-5 flex items-start justify-between gap-4 border-l-2 border-destructive bg-destructive/10 p-4 text-sm text-destructive" role="alert"><span>{error}</span><button aria-label="Dismiss error" onClick={() => setError('')}><X className="size-4" /></button></div>}
-          {tab === 'scan' && <><ScanView scanning={scanning} videoRef={videoRef} message={message} parts={parts} preview={preview} duplicate={duplicate} manual={manual} setManual={setManual} processScannedValue={processScannedValue} startScanner={startScanner} stopScanner={stopScanner} switchCamera={switchCamera} toggleTorch={toggleTorch} torch={torch} storePreview={storePreview} setPreview={setPreview} setDetail={setDetail} setTab={setTab} />{cameras.length > 0 && <label className="mx-auto mt-4 flex max-w-4xl items-center justify-between gap-4 border border-border bg-card p-4 text-sm"><span><strong className="block">Default camera</strong><span className="mt-1 block text-xs text-muted-foreground">Used automatically for the next scan on this device.</span></span><select value={defaultCameraId} onChange={(event) => chooseDefaultCamera(event.target.value)} className="native-control max-w-64"><option value="">Rear camera (automatic)</option>{cameras.map((camera, index) => <option key={camera.deviceId} value={camera.deviceId}>{camera.label || `Camera ${index + 1}`}</option>)}</select></label>}</>}
+          {tab === 'scan' && <><ScanView scanning={scanning} videoRef={videoRef} message={message} parts={parts} preview={preview} duplicate={duplicate} manual={manual} setManual={setManual} processScannedValue={processScannedValue} startScanner={startScanner} stopScanner={stopScanner} switchCamera={switchCamera} toggleTorch={toggleTorch} torch={torch} storePreview={storePreview} setPreview={setPreview} setDetail={setDetail} setTab={setTab} /><div className="mx-auto mt-4 grid max-w-4xl gap-4 md:grid-cols-2"><label className="flex items-center justify-between gap-4 border border-border bg-card p-4 text-sm"><span><strong className="block">Scanner result mode</strong><span className="mt-1 block text-xs text-muted-foreground">Match this to the QR result mode set in the quiz maker.</span></span><select value={scanMode} onChange={(event) => chooseScanMode(event.target.value as ScanMode)} className="native-control max-w-44"><option value="simple">Simple</option><option value="complete">Full</option></select></label>{cameras.length > 0 && <label className="flex items-center justify-between gap-4 border border-border bg-card p-4 text-sm"><span><strong className="block">Default camera</strong><span className="mt-1 block text-xs text-muted-foreground">Used automatically for the next scan on this device.</span></span><select value={defaultCameraId} onChange={(event) => chooseDefaultCamera(event.target.value)} className="native-control max-w-64"><option value="">Rear camera (automatic)</option>{cameras.map((camera, index) => <option key={camera.deviceId} value={camera.deviceId}>{camera.label || `Camera ${index + 1}`}</option>)}</select></label>}</div></>}
           {tab === 'results' && <ResultsView results={pageResults} total={filtered.length} summary={summary} search={search} setSearch={setSearch} statusFilter={statusFilter} setStatusFilter={setStatusFilter} page={page} pageCount={pageCount} setPage={setPage} detail={detail} setDetail={setDetail} removeResult={removeResult} editStudent={editStudent} refresh={refresh} />}
           {tab === 'analysis' && <AnalysisView analysis={analysis} results={results} />}
           {tab === 'more' && <MoreView results={results} importRef={importRef} importBackup={importBackup} setMessage={setMessage} refresh={refresh} setError={setError} />}
