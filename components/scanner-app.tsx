@@ -271,7 +271,8 @@ export function ScannerApp() {
       if (scannedCount === partial.totalParts) {
         const payload = Array.from({ length: partial.totalParts }, (_, index) => partial.chunks[index + 1]).join('');
         if (await sha256(payload) !== partial.checksum) throw new Error('Invalid result data. The scanned QR payload appears damaged or incomplete.');
-        const result = validateResult(await decodePayload(payload, partial.encoding));
+        const decoded = await decodePayload(payload, partial.encoding);
+        const result = (decoded as { format?: string })?.format === 'QUIQ_SIMPLE_RESULT' ? simpleResult(decoded) : validateResult(decoded);
         if (result.resultId !== envelope.resultId) throw new Error('Result identity does not match the QR envelope.');
         delete next[envelope.resultId];
         partsRef.current = { ...next };
