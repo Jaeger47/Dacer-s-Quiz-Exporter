@@ -68,11 +68,16 @@ export interface StudentResponse {
   correct: boolean;
   pointsAwarded: number;
   choices?: string[];
+  questionText?: string;
+  pointsPossible?: number;
+  displayOrder?: number;
+  choiceOrder?: number[];
 }
 
 export interface QuizResult {
   format: 'QUIQ_RESULT';
   version: '1.0';
+  resultDataMode?: 'simple' | 'complete';
   resultId: string;
   quizId: string;
   quizTitle: string;

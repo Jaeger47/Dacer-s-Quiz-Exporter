@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
+import { CheckedPaperExport } from '@/components/checked-paper-export';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { analyzeItems, analysisCsv, responsesCsv, resultsCsv, summarizeResults } from '@/lib/analytics';
@@ -72,6 +73,7 @@ export function ScannerApp() {
   const [cameras, setCameras] = useState<MediaDeviceInfo[]>([]);
   const [defaultCameraId, setDefaultCameraId] = useState('');
   const [scanMode, setScanMode] = useState<ScanMode>('simple');
+  const scanModeRef = useRef<ScanMode>('simple');
   const [torch, setTorch] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const controlsRef = useRef<IScannerControls | undefined>(undefined);
@@ -91,7 +93,8 @@ export function ScannerApp() {
   useEffect(() => {
     refresh();
     setDefaultCameraId(localStorage.getItem(DEFAULT_CAMERA_KEY) || '');
-    setScanMode(localStorage.getItem(SCAN_MODE_KEY) === 'complete' ? 'complete' : 'simple');
+    scanModeRef.current = localStorage.getItem(SCAN_MODE_KEY) === 'complete' ? 'complete' : 'simple';
+    setScanMode(scanModeRef.current);
     void loadCameras();
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('/service-worker.js').catch(() => setMessage('Offline cache will be available after the next visit.'));
     return () => controlsRef.current?.stop();
@@ -134,6 +137,7 @@ export function ScannerApp() {
   }
 
   function chooseScanMode(mode: ScanMode) {
+    scanModeRef.current = mode;
     setScanMode(mode);
     localStorage.setItem(SCAN_MODE_KEY, mode);
     setError('');
@@ -142,7 +146,7 @@ export function ScannerApp() {
 
   function ensureAcceptedMode(format: string | undefined) {
     const resultMode: ScanMode | undefined = format === 'QUIQ_SIMPLE_RESULT' ? 'simple' : format === 'QUIQ_RESULT' ? 'complete' : undefined;
-    if (resultMode && resultMode !== scanMode) throw new Error(`This is a ${resultMode === 'simple' ? 'Simple' : 'Full'} QR result. Switch the scanner to ${resultMode === 'simple' ? 'Simple' : 'Full'} mode and scan again.`);
+    if (resultMode && resultMode !== scanModeRef.current) throw new Error(`This is a ${resultMode === 'simple' ? 'Simple' : 'Full'} QR result. Switch the scanner to ${resultMode === 'simple' ? 'Simple' : 'Full'} mode and scan again.`);
   }
 
   async function startScanner(cameraOverride?: number) {
@@ -238,7 +242,7 @@ export function ScannerApp() {
     const result = value as QuizResult;
     const required = ['resultId', 'quizId', 'quizTitle', 'studentId', 'studentName', 'submittedAt', 'responses'];
     if (result?.format !== 'QUIQ_RESULT' || result.version !== '1.0' || required.some((key) => !(key in (result || {}))) || !Array.isArray(result.responses)) throw new Error('The QR data is not a supported Quiq result.');
-    return result;
+    return { ...result, resultDataMode: 'complete' };
   }
 
   function simpleResult(value: unknown): QuizResult {
@@ -248,7 +252,7 @@ export function ScannerApp() {
     const totalScore = Number(result.totalScore);
     const score = Number(result.score);
     const percentage = Number.isFinite(Number(result.percentage)) ? Number(result.percentage) : totalScore ? Math.round((score / totalScore) * 10000) / 100 : 0;
-    return { format: 'QUIQ_RESULT', version: '1.0', resultId: String(result.resultId), quizId: 'SIMPLE', quizTitle: 'Simple QR result', subject: '', section: '', teacher: '', studentName: String(result.studentName), studentId: '', studentSection: '', attempt: Number(result.attempt) || 1, score, totalScore, percentage, passed: false, passingPercentage: 0, startedAt: submittedAt, submittedAt, durationSeconds: 0, submissionReason: 'manual', autoSubmitted: false, violations: [], responses: [] };
+    return { format: 'QUIQ_RESULT', version: '1.0', resultDataMode: 'simple', resultId: String(result.resultId), quizId: 'SIMPLE', quizTitle: 'Simple QR result', subject: '', section: '', teacher: '', studentName: String(result.studentName), studentId: '', studentSection: '', attempt: Number(result.attempt) || 1, score, totalScore, percentage, passed: false, passingPercentage: 0, startedAt: submittedAt, submittedAt, durationSeconds: 0, submissionReason: 'manual', autoSubmitted: false, violations: [], responses: [] };
   }
 
   async function showPreview(result: QuizResult) {
@@ -405,7 +409,7 @@ function ResultsView({ results, total, summary, search, setSearch, statusFilter,
 
 function ResultDetail({ result, onBack, onDelete, onEdit }: { result: QuizResult; onBack: () => void; onDelete: () => void; onEdit: () => void }) {
   const counts = result.violations.reduce<Record<string, number>>((map, event) => ({ ...map, [event.type]: (map[event.type] || 0) + 1 }), {});
-  return <div className="mx-auto max-w-5xl"><Button variant="ghost" onClick={onBack}><ChevronLeft /> Back to results</Button><div className="mt-5 flex flex-col justify-between gap-4 border-b border-border pb-6 sm:flex-row sm:items-end"><div><p className="section-eyebrow">Student result</p><h1 className="section-title">{result.studentName}</h1><p className="section-copy">{result.studentId} · {result.studentSection} · Attempt {result.attempt}</p></div><div className="flex gap-2"><Button variant="outline" onClick={onEdit}>Edit student</Button><Button variant="destructive" onClick={onDelete}><Trash2 /> Delete result</Button></div></div><div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_310px]"><section className="space-y-5"><div className="grid gap-px border border-border bg-border sm:grid-cols-3"><div className="bg-card p-5"><p className="text-xs text-muted-foreground">Score</p><p className="mt-1 text-2xl font-semibold">{result.score} / {result.totalScore}</p></div><div className="bg-card p-5"><p className="text-xs text-muted-foreground">Percentage</p><p className="mt-1 text-2xl font-semibold">{result.percentage}%</p></div><div className="bg-card p-5"><p className="text-xs text-muted-foreground">Result</p><p className={`mt-1 text-2xl font-semibold ${result.passed ? 'text-emerald-300' : 'text-destructive'}`}>{result.passed ? 'Passed' : 'Failed'}</p></div></div><section className="border border-border bg-card p-5"><h2 className="font-semibold">Response review</h2><div className="mt-4 divide-y divide-border">{result.responses.map((response) => <div key={response.questionId} className="grid grid-cols-[54px_minmax(0,1fr)_auto] items-center gap-3 py-3 text-sm"><span className="font-mono text-xs text-muted-foreground">{response.questionId}</span><span>Student answer: <strong>{response.selectedAnswer === null ? 'Unanswered' : String.fromCharCode(65 + response.selectedAnswer)}</strong></span><Badge variant={response.correct ? 'outline' : 'destructive'} className={response.correct ? 'rounded-sm border-emerald-800 text-emerald-300' : 'rounded-sm'}>{response.correct ? 'Correct' : 'Incorrect'}</Badge></div>)}</div></section></section><aside className="space-y-5"><section className="border border-border bg-card p-5"><h2 className="font-semibold">Exam details</h2><dl className="mt-4 space-y-3 text-sm">{[['Quiz', result.quizTitle], ['Subject', result.subject], ['Started', formatDate(result.startedAt)], ['Submitted', formatDate(result.submittedAt)], ['Duration', `${Math.floor(result.durationSeconds / 60)}m ${result.durationSeconds % 60}s`], ['Reason', result.submissionReason], ['Result ID', result.resultId]].map(([label, value]) => <div key={label}><dt className="text-xs text-muted-foreground">{label}</dt><dd className="mt-0.5 break-words">{value}</dd></div>)}</dl></section><section className="border border-border bg-card p-5"><h2 className="font-semibold">Security summary</h2><p className="mt-3 text-3xl font-semibold">{result.violations.length}</p><p className="text-xs text-muted-foreground">total violations</p><dl className="mt-4 space-y-2 text-sm">{Object.entries(counts).map(([type, count]) => <div key={type} className="flex justify-between"><dt className="capitalize text-muted-foreground">{type.replaceAll('-', ' ')}</dt><dd>{count}</dd></div>)}</dl>{!result.violations.length && <p className="mt-4 text-sm text-muted-foreground">No security events recorded.</p>}</section></aside></div></div>;
+  return <div className="mx-auto max-w-5xl"><Button variant="ghost" onClick={onBack}><ChevronLeft /> Back to results</Button><div className="mt-5 flex flex-col justify-between gap-4 border-b border-border pb-6 sm:flex-row sm:items-end"><div><p className="section-eyebrow">Student result</p><h1 className="section-title">{result.studentName}</h1><p className="section-copy">{result.studentId} · {result.studentSection} · Attempt {result.attempt}</p></div><div className="flex gap-2"><Button variant="outline" onClick={onEdit}>Edit student</Button><Button variant="destructive" onClick={onDelete}><Trash2 /> Delete result</Button></div></div><CheckedPaperExport key={result.resultId} result={result} /><div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_310px]"><section className="space-y-5"><div className="grid gap-px border border-border bg-border sm:grid-cols-3"><div className="bg-card p-5"><p className="text-xs text-muted-foreground">Score</p><p className="mt-1 text-2xl font-semibold">{result.score} / {result.totalScore}</p></div><div className="bg-card p-5"><p className="text-xs text-muted-foreground">Percentage</p><p className="mt-1 text-2xl font-semibold">{result.percentage}%</p></div><div className="bg-card p-5"><p className="text-xs text-muted-foreground">Result</p><p className={`mt-1 text-2xl font-semibold ${result.passed ? 'text-emerald-300' : 'text-destructive'}`}>{result.passed ? 'Passed' : 'Failed'}</p></div></div><section className="border border-border bg-card p-5"><h2 className="font-semibold">Response review</h2><div className="mt-4 divide-y divide-border">{result.responses.map((response) => <div key={response.questionId} className="grid grid-cols-[54px_minmax(0,1fr)_auto] items-center gap-3 py-3 text-sm"><span className="font-mono text-xs text-muted-foreground">{response.questionId}</span><span>Student answer: <strong>{response.selectedAnswer === null ? 'Unanswered' : String.fromCharCode(65 + response.selectedAnswer)}</strong></span><Badge variant={response.correct ? 'outline' : 'destructive'} className={response.correct ? 'rounded-sm border-emerald-800 text-emerald-300' : 'rounded-sm'}>{response.correct ? 'Correct' : 'Incorrect'}</Badge></div>)}</div></section></section><aside className="space-y-5"><section className="border border-border bg-card p-5"><h2 className="font-semibold">Exam details</h2><dl className="mt-4 space-y-3 text-sm">{[['Quiz', result.quizTitle], ['Subject', result.subject], ['Started', formatDate(result.startedAt)], ['Submitted', formatDate(result.submittedAt)], ['Duration', `${Math.floor(result.durationSeconds / 60)}m ${result.durationSeconds % 60}s`], ['Reason', result.submissionReason], ['Result ID', result.resultId]].map(([label, value]) => <div key={label}><dt className="text-xs text-muted-foreground">{label}</dt><dd className="mt-0.5 break-words">{value}</dd></div>)}</dl></section><section className="border border-border bg-card p-5"><h2 className="font-semibold">Security summary</h2><p className="mt-3 text-3xl font-semibold">{result.violations.length}</p><p className="text-xs text-muted-foreground">total violations</p><dl className="mt-4 space-y-2 text-sm">{Object.entries(counts).map(([type, count]) => <div key={type} className="flex justify-between"><dt className="capitalize text-muted-foreground">{type.replaceAll('-', ' ')}</dt><dd>{count}</dd></div>)}</dl>{!result.violations.length && <p className="mt-4 text-sm text-muted-foreground">No security events recorded.</p>}</section></aside></div></div>;
 }
 
 function AnalysisView({ analysis, results }: { analysis: ReturnType<typeof analyzeItems>; results: QuizResult[] }) {

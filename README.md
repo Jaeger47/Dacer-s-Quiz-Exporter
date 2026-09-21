@@ -104,6 +104,16 @@ Imports validate:
 
 Validation errors identify the affected question whenever possible.
 
+## Checked student papers (Full mode)
+
+In the Quiz Creator, set **Quiz settings > QR result mode > Full** and export a new standalone quiz. After students submit, scan and save all result QR parts in Full scanner mode. Open **Scanner > Results**, select a student, then choose **Export checked paper PDF**.
+
+The A4 PDF includes the student's identity, questions and choices in their displayed order, selected and correct answers, correctness marks, points per item, and the final score and percentage. PDF generation happens on the teacher's device. The PDF fonts are bundled with the app. Load the export once online before using it offline so the browser can cache its code and fonts.
+
+Older Full-mode results can export recorded answers and grades, with missing question text clearly indicated. Existing exported quiz HTML files do not update automatically; re-export the quiz to capture full question text and displayed order. Simple-mode results have no item responses and cannot export checked papers. The added text in new Full results can increase the number of QR parts.
+
+PDF regression checks: `npx --yes --package tsx tsx --test tests/checked-paper.test.ts`.
+
 ## Standalone student quiz
 
 The exported file is named from Quiz ID, for example `IT123-Q1-2026.html`. It embeds quiz data, styling, timer, attempt controls, security monitoring, scoring, result integrity checking, compression, multi-part QR support, and the QR generator library. The embedded JavaScript and quiz payload are obfuscated during export with mangled identifiers, encoded strings, transformed control flow, and injected dead code to discourage casual source inspection.

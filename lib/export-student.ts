@@ -389,7 +389,15 @@ function studentQuizApplication(quiz: Quiz) {
     const responses = quiz.questions.map((question) => {
       const selectedAnswer = state.answers[question.id] ?? null;
       const correct = selectedAnswer === question.answer;
-      return { questionId: question.id, selectedAnswer, correctAnswer: question.answer, correct, pointsAwarded: correct ? Number(question.points) : 0, choices: question.choices };
+      const displayIndex = state.questions.findIndex((item: any) => item.id === question.id);
+      const displayedQuestion = state.questions[displayIndex];
+      return {
+        questionId: question.id, selectedAnswer, correctAnswer: question.answer, correct,
+        pointsAwarded: correct ? Number(question.points) : 0, choices: question.choices,
+        questionText: question.question, pointsPossible: Number(question.points),
+        displayOrder: displayIndex >= 0 ? displayIndex + 1 : undefined,
+        choiceOrder: displayedQuestion?.displayChoices?.map((choice: any) => choice.originalIndex),
+      };
     });
     const score = responses.reduce((sum, response) => sum + response.pointsAwarded, 0);
     const totalScore = quiz.questions.reduce((sum, question) => sum + Number(question.points), 0);
