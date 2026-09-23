@@ -5,7 +5,7 @@ export function canExportCheckedPaper(result: QuizResult): boolean {
 }
 
 export function paperResponses(result: QuizResult) {
-  // Older results use the original quiz order; keep their recorded answer mapping.
+  // Compact and older results use original quiz order and answer mapping.
   const ordered = result.responses.every((response) => Number.isInteger(response.displayOrder) && response.displayOrder! > 0)
     && new Set(result.responses.map((response) => response.displayOrder)).size === result.responses.length;
   return ordered ? [...result.responses].sort((a, b) => a.displayOrder! - b.displayOrder!) : result.responses;

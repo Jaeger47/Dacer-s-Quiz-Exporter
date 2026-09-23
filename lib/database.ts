@@ -41,7 +41,7 @@ export async function findSecondaryDuplicate(result: QuizResult): Promise<QuizRe
   return results.find(
     (item) =>
       item.resultId === result.resultId ||
-      (item.quizId === result.quizId && item.studentId === result.studentId && item.attempt === result.attempt),
+      (item.quizId === result.quizId && item.examCode === result.examCode && item.studentId === result.studentId && item.attempt === result.attempt),
   );
 }
 

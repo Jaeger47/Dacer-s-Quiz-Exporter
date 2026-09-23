@@ -14,7 +14,7 @@ export interface ItemAnalysisRow {
 export function summarizeResults(results: QuizResult[]) {
   const scores = results.map((result) => result.percentage);
   return {
-    students: new Set(results.map((result) => `${result.quizId}:${result.studentId}`)).size,
+    students: new Set(results.map((result) => `${result.quizId}:${result.examCode || ''}:${result.studentId}`)).size,
     results: results.length,
     average: results.length ? scores.reduce((sum, score) => sum + score, 0) / results.length : 0,
     highest: results.length ? Math.max(...scores) : 0,
@@ -62,30 +62,32 @@ export function toCsv(rows: unknown[][]) {
   return rows.map((row) => row.map(csvCell).join(',')).join('\r\n');
 }
 
-export function resultsCsv(results: QuizResult[]) {
+export function resultsCsv(results: QuizResult[], section?: string) {
   return toCsv([
-    ['Quiz ID', 'Quiz Title', 'Subject', 'Section', 'Student ID', 'Student Name', 'Score', 'Total', 'Percentage', 'Passed', 'Attempt', 'Violations', 'Auto Submitted', 'Submission Reason', 'Started', 'Submitted', 'Result ID'],
-    ...results.map((r) => [r.quizId, r.quizTitle, r.subject, r.studentSection, r.studentId, r.studentName, r.score, r.totalScore, r.percentage, r.passed, r.attempt, r.violations.length, r.autoSubmitted, r.submissionReason, r.startedAt, r.submittedAt, r.resultId]),
+    ['Quiz ID', 'Quiz Title', 'Subject', 'Section', 'Student ID', 'Student Name', 'Score', 'Total', 'Percentage', 'Passed', 'Attempt', 'Violations', 'Auto Submitted', 'Submission Reason', 'Started', 'Submitted', 'Result ID', 'Scanned At', 'Exam Code'],
+    ...results.map((r) => [r.quizId, r.quizTitle, r.subject, section ?? r.studentSection, r.studentId, r.studentName, r.score, r.totalScore, r.percentage, r.passed, r.attempt,
+      r.resultDataMode === 'compact' ? '' : r.violations.length, r.resultDataMode === 'compact' ? '' : r.autoSubmitted,
+      r.resultDataMode === 'compact' ? '' : r.submissionReason, r.startedAt, r.resultDataMode === 'compact' ? '' : r.submittedAt, r.resultId, r.recordedAt || '', r.examCode || '']),
   ]);
 }
 
-export function responsesCsv(results: QuizResult[]) {
+export function responsesCsv(results: QuizResult[], section?: string) {
   const ids = Array.from(new Set(results.flatMap((r) => r.responses.map((response) => response.questionId)))).sort();
   return toCsv([
-    ['Student ID', 'Student Name', ...ids, ...ids.map((id) => `${id}_Result`)],
+    ['Quiz ID', 'Section', 'Student ID', 'Student Name', 'Score', 'Total', ...ids, ...ids.map((id) => `${id}_Result`)],
     ...results.map((r) => {
       const map = new Map(r.responses.map((response) => [response.questionId, response]));
-      return [r.studentId, r.studentName, ...ids.map((id) => {
+      return [r.quizId, section ?? r.studentSection, r.studentId, r.studentName, r.score, r.totalScore, ...ids.map((id) => {
         const answer = map.get(id)?.selectedAnswer;
         return answer === null || answer === undefined ? '' : String.fromCharCode(65 + answer);
-      }), ...ids.map((id) => map.get(id)?.correct ? 'Correct' : 'Incorrect')];
+      }), ...ids.map((id) => !map.has(id) ? '' : map.get(id)?.selectedAnswer === null ? 'Unanswered' : map.get(id)?.correct ? 'Correct' : 'Incorrect')];
     }),
   ]);
 }
 
-export function analysisCsv(results: QuizResult[]) {
+export function analysisCsv(results: QuizResult[], section = '') {
   return toCsv([
-    ['Quiz ID', 'Question ID', 'Total Responses', 'Correct', 'Incorrect', 'Percent Correct', 'Percent Incorrect', 'Difficulty', 'Most Selected Answer'],
-    ...analyzeItems(results).map((row) => [results[0]?.quizId || '', row.questionId, row.total, row.correct, row.incorrect, row.percentCorrect.toFixed(1), (100 - row.percentCorrect).toFixed(1), row.difficulty, row.mostSelected]),
+    ['Quiz ID', 'Section', 'Question ID', 'Total Responses', 'Correct', 'Incorrect', 'Percent Correct', 'Percent Incorrect', 'Difficulty', 'Most Selected Answer'],
+    ...analyzeItems(results).map((row) => [results[0]?.quizId || '', section, row.questionId, row.total, row.correct, row.incorrect, row.percentCorrect.toFixed(1), (100 - row.percentCorrect).toFixed(1), row.difficulty, row.mostSelected]),
   ]);
 }

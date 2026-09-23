@@ -13,7 +13,7 @@ export interface QuizSettings {
   durationMinutes: number;
   allowedAttempts: number;
   resetPassword?: string;
-  resultDataMode?: 'simple' | 'complete';
+  resultDataMode?: 'compact' | 'simple' | 'complete';
   passingPercentage: number;
   randomizeQuestions: boolean;
   randomizeChoices: boolean;
@@ -43,6 +43,11 @@ export interface SecuritySettings {
   action: 'warning' | 'auto-submit';
 }
 
+export interface QuizStudent {
+  number: string;
+  name: string;
+}
+
 export interface Quiz {
   version: '1.0';
   quizId: string;
@@ -54,6 +59,7 @@ export interface Quiz {
   settings: QuizSettings;
   security: SecuritySettings;
   questions: QuizQuestion[];
+  students?: QuizStudent[];
 }
 
 export interface SecurityEvent {
@@ -77,7 +83,7 @@ export interface StudentResponse {
 export interface QuizResult {
   format: 'QUIQ_RESULT';
   version: '1.0';
-  resultDataMode?: 'simple' | 'complete';
+  resultDataMode?: 'compact' | 'simple' | 'complete';
   resultId: string;
   quizId: string;
   quizTitle: string;
@@ -96,11 +102,12 @@ export interface QuizResult {
   startedAt: string;
   submittedAt: string;
   durationSeconds: number;
-  submissionReason: 'manual' | 'timeout' | 'security-limit';
+  submissionReason: 'manual' | 'timeout' | 'security-limit' | 'compact-scan';
   autoSubmitted: boolean;
   violations: SecurityEvent[];
   responses: StudentResponse[];
   recordedAt?: string;
+  examCode?: string;
 }
 
 export interface QrEnvelope {
@@ -221,7 +228,21 @@ export function validateQuiz(value: unknown): { valid: boolean; errors: string[]
   if (!quiz.settings || !quiz.security) errors.push('Quiz settings or security configuration is missing.');
   if (quiz.settings) {
     if (String(quiz.settings.resetPassword || '').trim().length < 4) errors.push('Set a teacher reset password with at least 4 characters in Quiz settings.');
-    if (!['simple', 'complete'].includes(String(quiz.settings.resultDataMode || 'simple'))) quiz.settings.resultDataMode = 'simple';
+    if (!['compact', 'simple', 'complete'].includes(String(quiz.settings.resultDataMode || 'simple'))) quiz.settings.resultDataMode = 'simple';
+    if (quiz.settings.resultDataMode === 'compact') {
+      if (quiz.settings.allowedAttempts !== 1) errors.push('One-QR mode records one final result per student. Set allowed attempts to 1.');
+      if (!Array.isArray(quiz.students) || quiz.students.length === 0 || quiz.students.length > 99) errors.push('One-QR mode requires a student list of 1–99 students.');
+      if ((quiz.questions?.length || 0) > 200) errors.push('One-QR mode supports up to 200 questions per exam.');
+      const numbers = new Set<string>();
+      if (Array.isArray(quiz.students)) quiz.students.forEach((student) => {
+        if (!/^(0[1-9]|[1-9][0-9])$/.test(student?.number) || numbers.has(student?.number)) errors.push('Student numbers must be unique, from 01 to 99.');
+        numbers.add(student?.number);
+        if (typeof student?.name !== 'string' || !student.name.trim()) errors.push(`Student ${student?.number} needs a name.`);
+      });
+      quiz.questions?.forEach((question) => {
+        if (question.type === 'true-false' && (!Array.isArray(question.choices) || question.choices.length !== 2 || question.choices[0]?.toLowerCase() !== 'true' || question.choices[1]?.toLowerCase() !== 'false')) errors.push(`${question.id}: one-QR true/false choices must be True, False in that order.`);
+      });
+    }
   }
   if (quiz.security) quiz.security.action = 'auto-submit';
   return errors.length ? { valid: false, errors } : { valid: true, errors, quiz: quiz as Quiz };

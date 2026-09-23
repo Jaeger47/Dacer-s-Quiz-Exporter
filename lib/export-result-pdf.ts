@@ -93,7 +93,7 @@ export function buildCheckedPaperPdf(result: QuizResult, fonts: PdfFonts) {
   text(`Subject: ${result.subject || '-'}   |   Teacher: ${result.teacher || '-'}`);
   const submitted = new Date(result.submittedAt);
   text(`Quiz ID: ${result.quizId}   |   Attempt: ${result.attempt}`);
-  text(`Submitted: ${Number.isNaN(submitted.getTime()) ? '-' : submitted.toLocaleString()}`, { size: 9, color: muted, gap: 4 });
+  text(`${result.resultDataMode === 'compact' ? 'Scanned' : 'Submitted'}: ${Number.isNaN(submitted.getTime()) ? '-' : submitted.toLocaleString()}`, { size: 9, color: muted, gap: 4 });
   text(`FINAL SCORE: ${result.score} / ${result.totalScore}  (${result.percentage}%)`, { size: 16, bold: true, gap: 3 });
   text(`${result.passed ? 'PASSED' : 'FAILED'}   |   Passing mark: ${result.passingPercentage}%`, { bold: true });
   divider();
@@ -143,7 +143,7 @@ export function buildCheckedPaperPdf(result: QuizResult, fonts: PdfFonts) {
   const unanswered = result.responses.filter((response) => response.selectedAnswer === null).length;
   text(`Correct: ${correctCount}   |   Incorrect: ${result.responses.length - correctCount - unanswered}   |   Unanswered: ${unanswered}`, { size: 10 });
   text(`Final score: ${result.score} / ${result.totalScore} (${result.percentage}%)`, { size: 13, bold: true });
-  text(`Submission: ${result.submissionReason}   |   Recorded violations: ${result.violations.length}`, { size: 9, color: muted });
+  text(result.resultDataMode === 'compact' ? 'One-QR result: exam timing and security events were not transmitted.' : `Submission: ${result.submissionReason}   |   Recorded violations: ${result.violations.length}`, { size: 9, color: muted });
   text(`Result ID: ${result.resultId}`, { size: 8, color: muted });
 
   const pageCount = doc.getNumberOfPages();

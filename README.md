@@ -104,9 +104,26 @@ Imports validate:
 
 Validation errors identify the affected question whenever possible.
 
-## Checked student papers (Full mode)
+## One QR with a student list (recommended)
 
-In the Quiz Creator, set **Quiz settings > QR result mode > Full** and export a new standalone quiz. After students submit, scan and save all result QR parts in Full scanner mode. Open **Scanner > Results**, select a student, then choose **Export checked paper PDF**.
+1. Import or create the questions in Quiz Creator.
+2. Open **Students / One QR**, paste one student name per line, and select **Add names**. This enables one-QR mode and assigns stable numbers `01` through `99`. Removing a name does not renumber other students.
+3. Finish the answer key, then export the **student quiz HTML** and **scanner setup JSON**. Give students only the HTML. The setup contains the teacher's answer key and roster.
+4. In Scanner, select **Load scanner setup** and choose the matching `.scanner.json` file. On the maker's device you can also use **Use maker draft on this device**.
+5. Students find and select their name, confirm it, and complete the exam. Scan their single result QR and save. The camera resumes after saving or skipping an already saved result.
+6. After scanning, open **More**, choose the exam/student list, enter the section, and export scores, answers, or item-analysis CSV. Section is applied only to that file, not stored in the compact QR or changed in saved records.
+
+The payload is `01-121304...-EXAMCHECKCODE`: two-digit roster number, one answer digit per question, and a 12-character exam code. Digits `1–4` mean original choices A–D (`5–8` are supported when needed); `1/2` mean True/False; `0` means unanswered. Answers always follow the original question order, regardless of shuffled display order. A 60-question result uses only 76 characters. The teacher setup reconstructs names, question text, answer keys, weighted scores, item analysis, and checked PDFs.
+
+One-QR mode supports 1–99 students, 1–200 questions, and one final result per student. Repeated scans have a stable result identity and do not overwrite an existing result. Changing names, question order/content, answer keys, points, or passing marks changes the exam code: export both files again. A mismatched setup is rejected instead of grading against the wrong exam. The code detects setup mismatches, not deliberate answer tampering.
+
+Compact PDFs show original quiz order and original answer letters. Exam timing, detailed security events, and the student's randomized display order are not transmitted. The scanner labels the record with its scan time; CSV leaves unavailable submission/security fields blank. Security controls still operate inside the student exam. Full mode remains available for detailed timing/security records, and old Simple/Full QR results are still supported.
+
+Tests: `npx --yes --package tsx tsx --test tests/compact-qr.test.ts tests/checked-paper.test.ts`.
+
+## Checked student papers (One QR and Full mode)
+
+Use the one-QR setup above, or set **Quiz settings > QR result mode > Full** and export a new standalone quiz. After students submit, scan and save their result. Open **Scanner > Results**, select a student, then choose **Export checked paper PDF**.
 
 The A4 PDF includes the student's identity, questions and choices in their displayed order, selected and correct answers, correctness marks, points per item, and the final score and percentage. PDF generation happens on the teacher's device. The PDF fonts are bundled with the app. Load the export once online before using it offline so the browser can cache its code and fonts.
 
@@ -172,9 +189,9 @@ Camera access requires a secure browser context. Production must use HTTPS; loca
 5. Review the student, class, quiz, score, attempt, violations, and submission time.
 6. Select **Save result**.
 
-The scanner checks duplicates by Result ID and secondarily by Quiz ID + Student ID + Attempt. Exact duplicates open the existing record. A secondary duplicate requires explicit confirmation before saving separately.
+The scanner checks duplicates by Result ID and secondarily by Quiz ID + Exam Code + Student ID + Attempt. Exact duplicates can be skipped to return to the camera. A secondary duplicate requires explicit confirmation before saving separately.
 
-Manual QR JSON input is available for desktop testing or camera-restricted devices.
+Manual compact-code or QR JSON input is available for desktop testing or camera-restricted devices.
 
 ## Results and item analysis
 
@@ -245,4 +262,4 @@ No existing data is overwritten silently. Back up before clearing browser data, 
 - `examples/sample-result.json` demonstrates the normalized result model.
 - `examples/sample-backup.json` can be restored in the scanner.
 
-The QR scanner expects a `QUIQ_QR` envelope with a valid checksum for normal scans; the plain sample result is documentation and test data.
+The QR scanner accepts compact one-QR results with matching scanner setup, or legacy `QUIQ_QR` envelopes with a valid checksum. The plain sample result is documentation and test data.

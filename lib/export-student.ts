@@ -1,17 +1,20 @@
 import type { Quiz } from '@/lib/quiz-types';
+import { createScannerExam, encodeCompactResult } from '@/lib/compact-qr';
 
 declare const qrcode: (typeNumber: number, errorCorrectionLevel: string) => {
-  addData(data: string): void;
+  addData(data: string, mode?: string): void;
   make(): void;
   createSvgTag(cellSize?: number, margin?: number): string;
 };
 
-function studentQuizApplication(quiz: Quiz) {
+function studentQuizApplication(quiz: Quiz & { scannerCode?: string }, compactEncoder: typeof encodeCompactResult) {
   const root = document.getElementById('app') as HTMLElement;
   const alphabet = 'ABCDEFGH';
-  const attemptPrefix = `quiq-attempt:${quiz.quizId}:`;
-  const progressKey = `quiq-progress:${quiz.quizId}`;
-  const resultKey = `quiq-result:${quiz.quizId}`;
+  const compact = quiz.settings.resultDataMode === 'compact';
+  const storageScope = compact ? `${quiz.quizId}:${quiz.scannerCode}` : quiz.quizId;
+  const attemptPrefix = `quiq-attempt:${storageScope}:`;
+  const progressKey = `quiq-progress:${storageScope}`;
+  const resultKey = `quiq-result:${storageScope}`;
   let state: any = {
     screen: 'start',
     identity: { name: '', studentId: '', section: quiz.section || '' },
@@ -114,7 +117,7 @@ function studentQuizApplication(quiz: Quiz) {
           <p class="instructions">${escapeHtml(quiz.instructions)}</p>
           <dl class="facts">
             <div><dt>Subject</dt><dd>${escapeHtml(quiz.subject)}</dd></div>
-            <div><dt>Section</dt><dd>${escapeHtml(quiz.section)}</dd></div>
+            ${compact ? '' : `<div><dt>Section</dt><dd>${escapeHtml(quiz.section)}</dd></div>`}
             <div><dt>Questions</dt><dd>${quiz.questions.length}</dd></div>
             <div><dt>Total points</dt><dd>${totalPoints}</dd></div>
             <div><dt>Duration</dt><dd>${quiz.settings.durationMinutes} minutes</dd></div>
@@ -127,9 +130,9 @@ function studentQuizApplication(quiz: Quiz) {
           <h2>Before you begin</h2>
           <p>Your details stay on this device until you show the result QR to your teacher.</p>
           <form id="identity-form" class="form-grid">
-            <label>Student name${quiz.settings.requireName ? ' *' : ''}<input name="name" autocomplete="name" value="${escapeHtml(state.identity.name)}" ${quiz.settings.requireName ? 'required' : ''}></label>
+            ${compact ? `<label>Find your name *<input name="rosterStudent" list="student-list" autocomplete="off" placeholder="Type your name or roster number" value="${state.identity.studentId ? escapeHtml(state.identity.studentId + ' - ' + state.identity.name) : ''}" required><datalist id="student-list">${(quiz.students || []).map((student) => `<option value="${escapeHtml(student.number + ' - ' + student.name)}"></option>`).join('')}</datalist></label><p>Choose your own name from the list, then confirm it on the next screen.</p>` : `<label>Student name${quiz.settings.requireName ? ' *' : ''}<input name="name" autocomplete="name" value="${escapeHtml(state.identity.name)}" ${quiz.settings.requireName ? 'required' : ''}></label>
             <label>Student ID${quiz.settings.requireStudentId ? ' *' : ''}<input name="studentId" autocomplete="off" value="${escapeHtml(state.identity.studentId)}" ${quiz.settings.requireStudentId ? 'required' : ''}></label>
-            <label>Section${quiz.settings.requireSection ? ' *' : ''}<input name="section" value="${escapeHtml(state.identity.section)}" ${quiz.settings.requireSection ? 'required' : ''}></label>
+            <label>Section${quiz.settings.requireSection ? ' *' : ''}<input name="section" value="${escapeHtml(state.identity.section)}" ${quiz.settings.requireSection ? 'required' : ''}></label>`}
             <p id="form-error" class="error" role="alert"></p>
             <button class="primary" type="submit">Review information</button>
           </form>
@@ -142,8 +145,17 @@ function studentQuizApplication(quiz: Quiz) {
     (document.getElementById('identity-form') as HTMLFormElement).onsubmit = (event) => {
       event.preventDefault();
       const data = new FormData(event.currentTarget as HTMLFormElement);
-      state.identity = { name: String(data.get('name') || '').trim(), studentId: String(data.get('studentId') || '').trim(), section: String(data.get('section') || '').trim() };
-      const missing = (quiz.settings.requireName && !state.identity.name) || (quiz.settings.requireStudentId && !state.identity.studentId) || (quiz.settings.requireSection && !state.identity.section);
+      if (compact) {
+        const selected = (quiz.students || []).find((student) => `${student.number} - ${student.name}` === String(data.get('rosterStudent') || '').trim());
+        if (!selected) {
+          document.getElementById('form-error')!.textContent = 'Select your name from the student list. If it is missing, ask your teacher.';
+          return;
+        }
+        state.identity = { name: selected.name, studentId: selected.number, section: '' };
+      } else {
+        state.identity = { name: String(data.get('name') || '').trim(), studentId: String(data.get('studentId') || '').trim(), section: String(data.get('section') || '').trim() };
+      }
+      const missing = (quiz.settings.requireName && !state.identity.name) || (quiz.settings.requireStudentId && !state.identity.studentId) || (!compact && quiz.settings.requireSection && !state.identity.section);
       if (missing) {
         (document.getElementById('form-error') as HTMLElement).textContent = 'Complete every required field before continuing.';
         return;
@@ -171,7 +183,7 @@ function studentQuizApplication(quiz: Quiz) {
         <dl class="confirm-list">
           <div><dt>Name</dt><dd>${escapeHtml(state.identity.name || 'Not provided')}</dd></div>
           <div><dt>Student ID</dt><dd>${escapeHtml(state.identity.studentId || 'Not provided')}</dd></div>
-          <div><dt>Section</dt><dd>${escapeHtml(state.identity.section || 'Not provided')}</dd></div>
+          ${compact ? '' : `<div><dt>Section</dt><dd>${escapeHtml(state.identity.section || 'Not provided')}</dd></div>`}
           <div><dt>Attempts used</dt><dd>${used} / ${quiz.settings.allowedAttempts}</dd></div>
         </dl>
         ${quiz.security.enabled ? `<div class="security-note"><strong>Quiz security mode</strong><p>${quiz.security.requireFullscreen ? 'Fullscreen is required. ' : ''}Tab switches and prohibited actions may be recorded. The quiz ends and submits automatically at ${quiz.security.maximumViolations} violations.</p></div>` : ''}
@@ -363,6 +375,7 @@ function studentQuizApplication(quiz: Quiz) {
   }
 
   async function createQrParts(result: any) {
+    if (compact) return [compactEncoder(quiz.scannerCode!, state.identity.studentId, quiz.questions, state.answers)];
     const qrResult = quiz.settings.resultDataMode === 'complete'
       ? result
       : { format: 'QUIQ_SIMPLE_RESULT', version: '1.0', resultId: result.resultId, studentName: result.studentName, score: result.score, totalScore: result.totalScore, percentage: result.percentage, submittedAt: result.submittedAt, attempt: result.attempt };
@@ -432,7 +445,7 @@ function studentQuizApplication(quiz: Quiz) {
     const part = state.qrParts[state.qrIndex];
     let svg = '';
     try {
-      const qr = qrcode(0, 'H'); qr.addData(part); qr.make(); svg = qr.createSvgTag(8, 4);
+      const qr = qrcode(0, 'H'); qr.addData(part, compact ? 'Alphanumeric' : 'Byte'); qr.make(); svg = qr.createSvgTag(8, 32);
     } catch {
       svg = '<p class="error-block">Result data too large for this QR part.</p>';
     }
@@ -440,6 +453,12 @@ function studentQuizApplication(quiz: Quiz) {
     const qrPanel = `<section class="qr-panel"><div class="eyebrow">Scan this QR code</div><h2>Give this result to your teacher</h2><p>Keep each code steady inside the scanner frame.</p><div id="qr-code" class="qr-code" style="max-width:${state.qrSize}px">${svg}</div><div class="part-progress"><strong>QR ${state.qrIndex + 1} of ${state.qrParts.length}</strong><span>${state.qrParts.length > 1 ? 'Multi-part result — scan every part' : 'Single-part result'}</span></div><div class="qr-controls"><button id="previous-qr" class="secondary" ${state.qrIndex === 0 ? 'disabled' : ''}>Previous QR</button><button id="smaller-qr" class="secondary" aria-label="Decrease QR size">−</button><button id="larger-qr" class="secondary" aria-label="Increase QR size">+</button><button id="next-qr" class="primary" ${state.qrIndex === state.qrParts.length - 1 ? 'disabled' : ''}>Next QR</button></div>${attemptLimitReached ? '<button id="teacher-reset" class="quiet teacher-reset">Teacher reset</button>' : ''}</section>`;
     const resultSummary = `<section class="result-summary"><div class="eyebrow">Quiz submitted</div><div class="result-mark ${result.passed ? 'passed' : 'failed'}">${result.passed ? 'Passed' : 'Not passed'}</div><h1>${escapeHtml(result.studentName)}</h1>${quiz.settings.showScore ? `<div class="big-score"><strong>${result.score}</strong><span>/ ${result.totalScore}</span></div>` : ''}${quiz.settings.showPercentage ? `<p class="percentage">${result.percentage}%</p>` : ''}${attemptLimitReached ? `<div class="completion-lock"><strong>Attempt limit reached</strong><p>This quiz is locked on this device. The submitted answers cannot be changed or submitted again.</p></div>` : ''}<dl class="result-details"><div><dt>Attempts used</dt><dd>${attemptsUsed} / ${quiz.settings.allowedAttempts}</dd></div><div><dt>Violations</dt><dd>${result.violations.length}</dd></div><div><dt>Submission</dt><dd>${escapeHtml(result.submissionReason)}</dd></div><div><dt>Result ID</dt><dd class="result-id">${escapeHtml(result.resultId)}</dd></div></dl>${review}</section>`;
     root.innerHTML = `<main class="result-shell">${qrPanel}${resultSummary}</main>`;
+    if (state.qrParts.length === 1) {
+      document.getElementById('previous-qr')!.hidden = true;
+      document.getElementById('next-qr')!.hidden = true;
+      const controls = root.querySelector<HTMLElement>('.qr-controls');
+      if (controls) { controls.style.display = 'flex'; controls.style.justifyContent = 'center'; }
+    }
     document.getElementById('previous-qr')!.onclick = () => { state.qrIndex -= 1; renderResult(); };
     document.getElementById('next-qr')!.onclick = () => { state.qrIndex += 1; renderResult(); };
     document.getElementById('smaller-qr')!.onclick = () => { state.qrSize = Math.max(300, state.qrSize - 40); renderResult(); };
@@ -455,9 +474,12 @@ const studentStyles = String.raw`
 `;
 
 export async function generateStudentQuizHtml(quiz: Quiz, qrLibrarySource: string) {
-  const quizJson = JSON.stringify(quiz).replaceAll('</script', '<\\/script');
+  const preparedQuiz = quiz.settings.resultDataMode === 'compact'
+    ? { ...quiz, section: '', settings: { ...quiz.settings, requireSection: false }, students: quiz.students?.map((s) => ({ ...s, name: s.name.trim() })), scannerCode: (await createScannerExam(quiz)).code }
+    : quiz;
+  const quizJson = JSON.stringify(preparedQuiz).replaceAll('</script', '<\\/script');
   const applicationFunction = studentQuizApplication.toString().replace(/^function\s+studentQuizApplication/, 'function');
-  const applicationSource = `${qrLibrarySource}\n;(${applicationFunction})(${quizJson});`;
+  const applicationSource = `${qrLibrarySource}\n;(${applicationFunction})(${quizJson}, ${encodeCompactResult.toString()});`;
   const obfuscatorModule = await import('javascript-obfuscator') as typeof import('javascript-obfuscator') & {
     default?: typeof import('javascript-obfuscator');
   };
