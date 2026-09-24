@@ -108,6 +108,7 @@ Validation errors identify the affected question whenever possible.
 
 1. Import or create the questions in Quiz Creator.
 2. Open **Students / One QR**, paste one student name per line, and select **Add names**. This enables one-QR mode and assigns stable numbers `01` through `99`. Removing a name does not renumber other students.
+   Use **Delete all students** to replace the whole roster after confirmation. This clears only the maker's current list, not saved scanner results or exported files. Add the replacement list and re-export both the student HTML and scanner setup.
 3. Finish the answer key, then export the **student quiz HTML** and **scanner setup JSON**. Give students only the HTML. The setup contains the teacher's answer key and roster.
 4. In Scanner, select **Load scanner setup** and choose the matching `.scanner.json` file. On the maker's device you can also use **Use maker draft on this device**.
 5. Students find and select their name, confirm it, and complete the exam. Scan their single result QR and save. The camera resumes after saving or skipping an already saved result.
@@ -130,6 +131,14 @@ The A4 PDF includes the student's identity, questions and choices in their displ
 Older Full-mode results can export recorded answers and grades, with missing question text clearly indicated. Existing exported quiz HTML files do not update automatically; re-export the quiz to capture full question text and displayed order. Simple-mode results have no item responses and cannot export checked papers. The added text in new Full results can increase the number of QR parts.
 
 PDF regression checks: `npx --yes --package tsx tsx --test tests/checked-paper.test.ts`.
+
+### Bulk checked papers
+
+Individual and bulk PDFs include the supplied Bukidnon State University image as a header on every page, with reserved space above the exam content. The header is bundled locally and cached by the service worker for offline use after the updated app has loaded online.
+
+In **Scanner > Results**, use **Bulk student test papers**. Select the exam/student list, enter the section (required when missing from saved records), then choose **Download all student PDFs**. This downloads one combined A4 PDF; each student's checked paper starts on a new page with its own page numbering. Names, questions, choices, selected/correct answers, marks, and final scores are included, using the same question-order rules as individual PDFs.
+
+Bulk export includes every eligible saved result in the selected exam group, across all result pages; search and status filters do not limit it. Papers are sorted by student number, with separate papers for recorded attempts. Simple-mode/empty results are excluded with a visible count, and older results missing question text are flagged. The section entered affects only the PDF, not stored records. Different exam codes are kept in separate groups; legacy results are also grouped by their saved section. Keep this screen open while a large class is being generated.
 
 ## Standalone student quiz
 

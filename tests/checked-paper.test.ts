@@ -5,11 +5,13 @@ import test from 'node:test';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { CheckedPaperExport } from '../components/checked-paper-export';
-import { buildCheckedPaperPdf } from '../lib/export-result-pdf';
+import { BulkPaperExport } from '../components/bulk-paper-export';
+import { buildCheckedPaperPdf, buildBulkCheckedPaperPdf } from '../lib/export-result-pdf';
 import { canExportCheckedPaper, checkedPaperFilename, paperAnswer, paperChoices, paperResponses } from '../lib/result-paper';
 import type { QuizResult, StudentResponse } from '../lib/quiz-types';
 
 const fonts = {
+  headerImage: `data:image/png;base64,${readFileSync(new URL('../public/buksu-pdf-header.png', import.meta.url)).toString('base64')}`,
   regular: readFileSync(new URL('../public/fonts/NotoSans-Regular.ttf', import.meta.url)).toString('base64'),
   bold: readFileSync(new URL('../public/fonts/NotoSans-Bold.ttf', import.meta.url)).toString('base64'),
 };
@@ -97,4 +99,36 @@ test('the scanner offers the PDF button only for results with full answers', () 
   const markup = renderToStaticMarkup(createElement(CheckedPaperExport, { result: simple }));
   assert.doesNotMatch(markup, /<button/);
   assert.match(markup, /Full-mode results/);
+});
+
+test('bulk PDF starts each student on a fresh page, reports progress and never mutates records', async () => {
+  const second = { ...result, resultId: 'second', studentId: '02', studentName: 'Juan Dela Cruz', studentSection: '', section: '', resultDataMode: 'compact' as const };
+  const first = { ...result, studentId: '01' };
+  const original = JSON.stringify([second, first]);
+  const progress: number[][] = [];
+  const pdf = await buildBulkCheckedPaperPdf([second, first], fonts, 'BSIT 3B', (done, total) => progress.push([done, total]));
+  assert.equal(pdf.getNumberOfPages(), buildCheckedPaperPdf(first, fonts).getNumberOfPages() + buildCheckedPaperPdf(second, fonts).getNumberOfPages());
+  assert.deepEqual(progress, [[1, 2], [2, 2]]);
+  assert.equal(JSON.stringify([second, first]), original);
+  // jsPDF types declare number[] here, but runtime pages contain PDF command arrays.
+  const commands = pdf.internal.pages as unknown as string[][];
+  assert.ok(commands.slice(1).every((page) => page.some((command) => command.includes('/I0 Do'))), 'University header must be drawn on every page of every student paper');
+  saveQa('bulk-papers.pdf', pdf);
+});
+
+test('bulk PDF rejects empty batches and unsupported papers', async () => {
+  await assert.rejects(buildBulkCheckedPaperPdf([], fonts), /No checked papers/);
+  await assert.rejects(buildBulkCheckedPaperPdf([{ ...result, resultDataMode: 'simple' }], fonts), /recorded answers/);
+});
+
+test('bulk UI includes entire exam group, reports exclusions and requires missing section', () => {
+  const compact = { ...result, resultDataMode: 'compact' as const, studentSection: '', section: '', examCode: '123456ABCDEF' };
+  const results = Array.from({ length: 25 }, (_, index) => ({ ...compact, resultId: `bulk-${index}`, studentId: String(index + 1).padStart(2, '0') }));
+  const markup = renderToStaticMarkup(createElement(BulkPaperExport, { results: [...results, { ...compact, resultDataMode: 'simple', responses: [] }] }));
+  assert.match(markup, /25 eligible paper/);
+  assert.match(markup, /excluded: Simple mode or no recorded answers/);
+  assert.match(markup, /required/);
+  assert.match(markup, /<button[^>]*disabled/);
+  assert.match(markup, /Download all student PDFs/);
+  assert.match(markup, /Search and status filters do not limit this export/);
 });

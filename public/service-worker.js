@@ -1,5 +1,5 @@
-const CACHE_NAME = 'quiq-offline-v2';
-const APP_SHELL = ['/', '/scanner', '/manifest.webmanifest', '/quiq-icon.svg', '/og.png', '/fonts/NotoSans-Regular.ttf', '/fonts/NotoSans-Bold.ttf'];
+const CACHE_NAME = 'quiq-offline-v3';
+const APP_SHELL = ['/', '/scanner', '/manifest.webmanifest', '/quiq-icon.svg', '/og.png', '/fonts/NotoSans-Regular.ttf', '/fonts/NotoSans-Bold.ttf', '/buksu-pdf-header.png'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)).then(() => self.skipWaiting()));

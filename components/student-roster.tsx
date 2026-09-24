@@ -12,6 +12,11 @@ export function StudentRoster({ quiz, onChange }: { quiz: Quiz; onChange: (quiz:
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
   const students = quiz.students || [];
+  function deleteAllStudents() {
+    if (!students.length || !confirm(`Delete all ${students.length} students from this quiz's list? This cannot be undone. Saved scanner results and previously exported files will not be deleted. Add the new list and re-export both the exam and scanner setup before using it.`)) return;
+    onChange({ ...quiz, students: [] });
+    setMessage('All students removed from this quiz. Add a new list and re-export the exam and scanner setup. Existing scanned results are unchanged.');
+  }
   function addNames() {
     const lines = names.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
     if (!lines.length) return;
@@ -49,11 +54,11 @@ export function StudentRoster({ quiz, onChange }: { quiz: Quiz; onChange: (quiz:
       <p className="mt-2 text-sm text-muted-foreground">Paste one student name per line. Each receives a permanent roster number from 01 to 99. Students search and select their name before starting.</p>
       <Textarea aria-label="Student names, one per line" className="mt-4 min-h-36" value={names} onChange={(event) => setNames(event.target.value)} placeholder={'Maria Santos\nJuan Dela Cruz'} />
       <div className="mt-3 flex flex-wrap gap-2"><Button onClick={addNames} disabled={!names.trim()}>Add names</Button><Button variant="outline" onClick={() => onChange({ ...quiz, settings: { ...quiz.settings, resultDataMode: 'compact', allowedAttempts: 1, requireSection: false } })}>Use one-QR mode</Button><Button variant="outline" disabled={busy || !students.length} onClick={exportSetup}>{busy ? 'Preparing…' : 'Export scanner setup'}</Button></div>
-      <p className="mt-3 text-xs text-muted-foreground">1. Add names and finish the answer key. 2. Export the student exam and matching scanner setup. 3. Load the setup in Scanner. Section is entered only when exporting CSV. The scanner setup contains the answer key; keep it with the teacher.</p>
+      <p className="mt-3 text-xs text-muted-foreground">1. Add names and finish the answer key. 2. Export the student exam and matching scanner setup. 3. Load the setup in Scanner. Section is entered when exporting CSV or bulk PDFs. The scanner setup contains the answer key; keep it with the teacher.</p>
       <p className="mt-2 text-xs text-muted-foreground">Changing the roster, questions, or grading requires exporting both files again. One-QR mode supports 200 questions and one final result per student. Detailed security events and exam timing stay on the student's device.</p>
       {message && <p className="mt-3 text-sm" role="status">{message}</p>}
     </section>
-    <section className="border border-border bg-card p-5"><h2 className="mb-4 font-semibold">{students.length} students</h2>
+    <section className="border border-border bg-card p-5"><div className="mb-4 flex flex-wrap items-center justify-between gap-3"><h2 className="font-semibold">{students.length} students</h2><Button variant="destructive" disabled={!students.length || busy} onClick={deleteAllStudents}>Delete all students</Button></div>
       <div className="space-y-2">{students.map((student, index) => <div key={student.number} className="flex items-center gap-3"><span className="w-8 font-mono">{student.number}</span><Input aria-label={`Student ${student.number} name`} value={student.name} onChange={(event) => onChange({ ...quiz, students: students.map((item, i) => i === index ? { ...item, name: event.target.value } : item) })} /><Button variant="outline" onClick={() => { if (confirm(`Remove ${student.number} - ${student.name}? Re-export the exam and setup after changing the roster.`)) onChange({ ...quiz, students: students.filter((_, i) => i !== index) }); }}>Remove</Button></div>)}</div>
     </section>
   </div>;
